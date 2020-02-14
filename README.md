@@ -107,3 +107,5 @@ class Main {
 ```
 
 3) Run watcher: `composer haxe:watch`
+
+![](https://habrastorage.org/webt/ka/bp/yl/kabpyl5a686zjssaaxkmo17yz0a.png)
