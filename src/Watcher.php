@@ -11,72 +11,91 @@ declare(strict_types=1);
 
 namespace Serafim\HaxeWatcher;
 
-use Composer\Composer;
-use Composer\IO\IOInterface;
-use Composer\Plugin\Capability\CommandProvider;
-use Composer\Plugin\Capable;
-use Composer\Plugin\PluginInterface;
-use Serafim\HaxeWatcher\Command\WatchCommand;
+use Symfony\Component\Finder\Finder;
+use Yosymfony\ResourceWatcher\ContentHashInterface;
+use Yosymfony\ResourceWatcher\Crc32ContentHash;
+use Yosymfony\ResourceWatcher\ResourceCacheInterface;
+use Yosymfony\ResourceWatcher\ResourceCachePhpFile;
+use Yosymfony\ResourceWatcher\ResourceWatcher;
+use Yosymfony\ResourceWatcher\ResourceWatcherResult;
 
 /**
  * Class Watcher
  */
-final class Watcher implements PluginInterface, CommandProvider, Capable
+class Watcher
 {
     /**
-     * {@inheritDoc}
+     * @var bool
      */
-    public function activate(Composer $composer, IOInterface $io): void
+    private bool $init = false;
+
+    /**
+     * @var Config
+     */
+    private Config $config;
+
+    /**
+     * Watcher constructor.
+     *
+     * @param Config $config
+     */
+    public function __construct(Config $config)
     {
-        $config = Config::fromComposer($composer);
-
-        $io->write('<comment>Detect Haxe Compiler</comment>');
-
-        $compiler = $config->getCompiler();
-
-        $this->check($io, '  - Version %s', static function () use ($compiler): string {
-            return $compiler->version();
-        });
+        $this->config = $config;
     }
 
     /**
-     * @param IOInterface $io
-     * @param string $message
-     * @param \Closure $cmd
+     * @param ResourceWatcherResult $result
+     * @param \Closure $each
      * @return void
      */
-    private function check(IOInterface $io, string $message, \Closure $cmd): void
+    private function check(ResourceWatcherResult $result, \Closure $each): void
     {
         try {
-            $io->write(\sprintf($message, ''), false);
-
-            $result = $cmd() ?: 'OK';
-
-            $io->overwrite(\sprintf($message, '<info>' . $result . '</info>'));
-        } catch (\Throwable $e) {
-            $io->overwrite(\sprintf($message, '<error> ' . $e->getMessage() . ' </error>'));
-
-            return;
+            $each($result, $this->init);
+        } finally {
+            $this->init = true;
         }
     }
 
     /**
-     * {@inheritDoc}
+     * @return ContentHashInterface
      */
-    public function getCommands(): array
+    private function getHash(): ContentHashInterface
     {
-        return [
-            new WatchCommand()
-        ];
+        return new Crc32ContentHash();
     }
 
     /**
-     * @return array
+     * @return ResourceCacheInterface
      */
-    public function getCapabilities(): array
+    private function getCache(): ResourceCacheInterface
     {
-        return [
-            CommandProvider::class => self::class,
-        ];
+        return new ResourceCachePhpFile($this->config->getOutputDirectory() . '/.watcher.cache.php');
+    }
+
+    /**
+     * @param Finder $finder
+     * @return ResourceWatcher
+     */
+    private function getWatcher(Finder $finder): ResourceWatcher
+    {
+        return new ResourceWatcher($this->getCache(), $finder, $this->getHash());
+    }
+
+    /**
+     * @param \Closure $each
+     * @return void
+     */
+    public function run(\Closure $each): void
+    {
+        $watcher = $this->getWatcher($this->config->getFinder());
+        $watcher->initialize();
+
+        while (true) {
+            $this->check($watcher->findChanges(), $each);
+
+            \usleep($this->config->getWatchTime());
+        }
     }
 }

@@ -169,6 +169,14 @@ final class Config
     }
 
     /**
+     * @return Watcher
+     */
+    public function getWatcher(): Watcher
+    {
+        return new Watcher($this);
+    }
+
+    /**
      * @return string
      */
     public function getOutputDirectory(): string
@@ -191,14 +199,20 @@ final class Config
      */
     public function getFiles(): iterable
     {
-        $files = (new Finder())
+        foreach ($this->getFinder() as $file) {
+            yield new File($this->getOutputDirectory(), $file);
+        }
+    }
+
+    /**
+     * @return Finder|\SplFileInfo[]
+     */
+    public function getFinder(): Finder
+    {
+        return (new Finder())
             ->files()
             ->name('*.hx')
             ->in($this->getSources());
-
-        foreach ($files as $file) {
-            yield new File($this->getOutputDirectory(), $file);
-        }
     }
 
     /**

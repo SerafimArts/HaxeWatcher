@@ -1,5 +1,17 @@
 # Haxe PHP Watcher
 
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Example](#example)
+
+## Requirements
+
+1) PHP >= 7.4
+2) Haxe Compiler (for local development only)
+3) Composer
+
 ## Installation
 
 - `composer require serafim/haxe-watcher`
@@ -39,15 +51,21 @@ Configuration using `extra` section in your `composer.json` file:
 
 ## Usage
 
+#### Haxe Compiler Version
+
 ```bash
-$ composer haxe-watch
+$ composer haxe:version
+```
+
+#### Run Haxe Watcher
+
+```bash
+$ composer haxe:watch
 ```
 
 ## Example
 
-An example project:
-
-#### Project Structure
+### Project Structure
 
 ```
 - app/
@@ -55,7 +73,9 @@ An example project:
 - composer.json
 ```
 
-#### Composer File
+### Instruction
+
+1) Create `composer.json` with following code
 
 ```json5
 {
@@ -64,9 +84,6 @@ An example project:
     },
     "autoload": {
         "psr-4": {
-            // Note!
-            //   1) Haxe can NOT compile non PSR-0 namespaces.
-            //   2) All namespaces (modules) should be in lowercase.
             "app": "app"
         }
     },
@@ -75,7 +92,9 @@ An example project:
 }
 ```
 
-#### Main.hx File
+2) Create `app/Main.hx` with following code:
+
+Main.hx File
 
 ```haxe
 module app;
@@ -87,8 +106,4 @@ class Main {
 }
 ```
 
-#### Running
-
-```bash
-$ composer haxe-watch
-```
+3) Run watcher: `composer haxe:watch`

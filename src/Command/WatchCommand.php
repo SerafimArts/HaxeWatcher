@@ -13,9 +13,9 @@ namespace Serafim\HaxeWatcher\Command;
 
 use Composer\Command\BaseCommand;
 use Serafim\HaxeWatcher\Config;
-use Serafim\HaxeWatcher\File;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Yosymfony\ResourceWatcher\ResourceWatcherResult;
 
 /**
  * Class WatchCommand
@@ -23,79 +23,59 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class WatchCommand extends BaseCommand
 {
     /**
-     * @var array
-     */
-    private array $timestamps = [];
-
-    /**
      * {@inheritDoc}
      */
     protected function configure(): void
     {
-        $this->setName('haxe-watch');
+        $this->setName('haxe:watch');
+        $this->setDescription('Run Haxe watcher and compile sources if necessary');
     }
 
     /**
      * {@inheritDoc}
+     * @throws \Exception
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $config = Config::fromComposer($this->getComposer());
 
-        $compiler = $config->getCompiler();
+        $watcher = $config->getWatcher();
 
-        $output->writeln('<comment>Run Watcher</comment> (' . $this->now() . ')');
+        $output->writeln($this->message('<comment>Run Watcher</comment> (%s)'));
 
-        while (true) {
-            if (($files = $this->watch($config)) !== []) {
-                $config->regenerate($config->getBuildConfigName());
+        $watcher->run(function (ResourceWatcherResult $result, bool $initialized) use ($config, $output): void {
+            $hxml = $config->getBuildConfigName();
+
+            if ($initialized === false || $result->hasChanges()) {
+                $config->regenerate($hxml);
 
                 try {
-                    $result = $compiler->compile($config->getPath($config->getBuildConfigName())) ?: 'OK';
+                    $out = $config->getCompiler()
+                        ->compile($config->getPath($hxml)) ?: 'OK';
 
-                    foreach ($files as $current) {
-                        $current->publish();
+                    foreach ($config->getFiles() as $file) {
+                        $file->publish();
                     }
 
-                    $output->writeln('  - Compilation <info>' . $result . '</info> (' . $this->now() . ')');
+                    $output->writeln($this->message("  - Compilation <info>$out</info> (%s)"));
                 } catch (\Throwable $e) {
-                    $output->writeln('<error>' . $e->getMessage() . '</error>');
+                    $message = $e->getMessage();
+
+                    $output->writeln($this->message("  - Compilation <error>$message</error> (%s)"));
                 }
             }
-
-            \usleep($config->getWatchTime());
-        }
+        });
 
         return 0;
     }
 
     /**
+     * @param string $message
      * @return string
      * @throws \Exception
      */
-    private function now(): string
+    private function message(string $message): string
     {
-        $time = new \DateTime();
-
-        return $time->format(\DateTime::RFC3339);
-    }
-
-    /**
-     * @param Config $config
-     * @return array|File[]
-     */
-    private function watch(Config $config): array
-    {
-        $result = [];
-
-        foreach ($config->getFiles() as $file) {
-            if (($this->timestamps[$file->getId()] ?? null) !== $file->getMTime()) {
-                $this->timestamps[$file->getId()] = $file->getMTime();
-
-                $result[] = $file;
-            }
-        }
-
-        return $result;
+        return \sprintf($message, (new \DateTime())->format(\DateTime::RFC3339));
     }
 }
